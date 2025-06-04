@@ -14,18 +14,18 @@ componentes = [
 ]
 
 pesos_padrao = {
-    "Origem": "00:30",
-    "Grupo de Controle": "01:00",
-    "Canal": "01:00",
-    "Decisão": "00:30",
-    "Espera": "00:15",
-    "Multiplas Rotas Paralelas": "01:30",
-    "Contagem Dinâmica": "01:00",
-    "Exportação de Público": "00:30",
-    "Espera por uma data": "00:15",
-    "Random Split": "01:00",
-    "Join": "01:00",
-    "Término": "00:15"
+    "Origem": "00:05",
+    "Grupo de Controle": "00:01",
+    "Canal": "00:05",
+    "Decisão": "00:05",
+    "Espera": "00:01",
+    "Multiplas Rotas Paralelas": "00:05",
+    "Contagem Dinâmica": "00:01",
+    "Exportação de Público": "00:05",
+    "Espera por uma data": "00:01",
+    "Random Split": "00:05",
+    "Join": "00:01",
+    "Término": "00:01"
 }
 
 # 🔧 Funções auxiliares
