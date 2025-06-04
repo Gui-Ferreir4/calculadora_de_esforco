@@ -5,26 +5,21 @@ import re
 
 st.set_page_config(page_title="Calculadora de Tempos", layout="wide")
 
-st.title("⏱️ Calculadora de Tempos - Via Tabela Colada (2 linhas por item)")
+st.title("⏱️ Calculadora de Tempos por Detecção no Texto")
 
 st.markdown("""
-Cole abaixo a tabela copiada do Excel (onde cada item ocupa duas linhas). 
-O app buscará a coluna **"Componente"** e fará o cálculo com base nos pesos definidos.
+Cole abaixo qualquer texto que contenha os componentes (não precisa estar formatado como tabela).  
+O app irá identificar, contar e calcular os tempos de execução com base nos pesos definidos.
 """)
 
-# Função para remover textos entre parênteses
-def limpar_tipo(texto):
-    if pd.isna(texto):
-        return ""
-    return re.sub(r"\s*\(.*?\)", "", str(texto)).strip()
-
-
+# Lista dos tipos conhecidos
 tipos = [
     "Origem", "Grupo de Controle", "Canal", "Decisão", "Espera",
     "Multiplas Rotas Paralelas", "Contagem Dinâmica", "Exportação de Público",
     "Espera por uma data", "Random Split", "Join", "Término"
 ]
 
+# Pesos padrão no formato HH:MM
 pesos_padrao = {
     "Origem": "00:30", "Grupo de Controle": "01:00", "Canal": "01:00",
     "Decisão": "00:30", "Espera": "00:15", "Multiplas Rotas Paralelas": "01:30",
@@ -33,118 +28,88 @@ pesos_padrao = {
     "Término": "00:15"
 }
 
-# Entrada da tabela
-st.subheader("📋 Cole aqui sua tabela (incluindo cabeçalhos)")
-
+# Campo de entrada de texto
 texto = st.text_area(
-    "Cole os dados aqui (copiados do Excel):",
-    placeholder="Exemplo:\nID\tComponente\t...\nxxx\tOrigem\t...\n02/06/2025 ...\t3s\t..."
+    "📋 Cole aqui o texto (copiado de qualquer lugar, incluindo tabelas, prints do excel ou outros):",
+    height=300,
+    placeholder="Cole aqui..."
 )
 
 if texto.strip() != "":
-    try:
-        linhas = texto.strip().splitlines()
-        linhas = [linha for linha in linhas if linha.strip() != ""]
+    st.subheader("⚙️ Definir Pesos (HH:MM)")
+    col1, col2 = st.columns(2)
 
-        # Extrair cabeçalhos
-        cabecalho = linhas[0].split('\t')
-        linhas = linhas[1:]
+    pesos_usuario = {}
 
-        registros = []
+    with col1:
+        for tipo in tipos[:len(tipos)//2]:
+            valor = st.text_input(f"{tipo}:", value=pesos_padrao.get(tipo, "00:00"))
+            pesos_usuario[tipo] = valor
 
-        for i in range(0, len(linhas), 2):
-            linha1 = linhas[i].split('\t')
-            linha2 = linhas[i + 1].split('\t') if i + 1 < len(linhas) else [""] * len(cabecalho)
+    with col2:
+        for tipo in tipos[len(tipos)//2:]:
+            valor = st.text_input(f"{tipo}:", value=pesos_padrao.get(tipo, "00:00"))
+            pesos_usuario[tipo] = valor
 
-            registro = {}
+    # Função para buscar ocorrências ignorando textos entre parênteses
+    def limpar_tipo(texto):
+        return re.sub(r"\s*\(.*?\)", "", texto).strip()
 
-            # Combinar colunas da linha 1 e linha 2
-            for idx, nome_coluna in enumerate(cabecalho):
-                val1 = linha1[idx] if idx < len(linha1) else ""
-                val2 = linha2[idx] if idx < len(linha2) else ""
+    # Contagem dos componentes no texto
+    contagem = {}
+    for tipo in tipos:
+        padrao = re.compile(rf'\b{re.escape(tipo)}\b', re.IGNORECASE)
+        ocorrencias = len(padrao.findall(re.sub(r'\(.*?\)', '', texto)))
+        contagem[tipo] = ocorrencias
 
-                if nome_coluna in ["ID", "Componente"]:
-                    registro[nome_coluna] = val1
-                else:
-                    registro[nome_coluna] = val2 if val2 else val1
+    # Conversão de HH:MM para timedelta
+    def hhmm_para_timedelta(hhmm):
+        try:
+            h, m = map(int, hhmm.strip().split(":"))
+            return pd.Timedelta(hours=h, minutes=m)
+        except:
+            return pd.Timedelta(0)
 
-            registros.append(registro)
+    pesos_tempo = {tipo: hhmm_para_timedelta(valor) for tipo, valor in pesos_usuario.items()}
 
-        df = pd.DataFrame(registros)
+    # Montagem da tabela de resultados
+    df_resultado = pd.DataFrame({
+        "Tipo": tipos,
+        "Peso (hh:mm)": [pesos_usuario[t] for t in tipos],
+        "Quantidade": [contagem[t] for t in tipos],
+        "Total de Horas": [pesos_tempo[t] * contagem[t] for t in tipos]
+    })
 
-        st.subheader("🗂️ Dados Interpretados")
-        st.dataframe(df)
+    total_quantidade = df_resultado["Quantidade"].sum()
+    total_tempo = df_resultado["Total de Horas"].sum()
 
-        if "Componente" not in df.columns:
-            st.error("⚠️ A tabela precisa ter uma coluna chamada 'Componente'. Verifique os cabeçalhos.")
-        else:
-            componentes = df["Componente"].map(limpar_tipo)
-            contagem = componentes.value_counts().reindex(tipos, fill_value=0)
+    total_row = pd.DataFrame({
+        "Tipo": ["TOTAL"],
+        "Peso (hh:mm)": [""],
+        "Quantidade": [total_quantidade],
+        "Total de Horas": [total_tempo]
+    })
 
-            st.subheader("⚙️ Defina os Pesos (HH:MM)")
-            col1, col2 = st.columns(2)
+    df_resultado = pd.concat([df_resultado, total_row], ignore_index=True)
 
-            with col1:
-                pesos_usuario = {}
-                for tipo in tipos[:len(tipos)//2]:
-                    valor = st.text_input(f"{tipo}:", value=pesos_padrao.get(tipo, "00:00"))
-                    pesos_usuario[tipo] = valor
+    st.subheader("📊 Resultado Final")
+    st.dataframe(df_resultado)
 
-            with col2:
-                for tipo in tipos[len(tipos)//2:]:
-                    valor = st.text_input(f"{tipo}:", value=pesos_padrao.get(tipo, "00:00"))
-                    pesos_usuario[tipo] = valor
+    # Gerar Excel
+    def converter_excel(df):
+        from io import BytesIO
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name="Resultado")
+            writer.close()
+        return output.getvalue()
 
-            # Conversão de HH:MM para timedelta
-            def hhmm_para_timedelta(hhmm):
-                try:
-                    h, m = map(int, hhmm.strip().split(":"))
-                    return pd.Timedelta(hours=h, minutes=m)
-                except:
-                    return pd.Timedelta(0)
-
-            pesos_tempo = {tipo: hhmm_para_timedelta(valor) for tipo, valor in pesos_usuario.items()}
-
-            df_resultado = pd.DataFrame({
-                "Tipo": tipos,
-                "Peso (hh:mm)": [pesos_usuario[t] for t in tipos],
-                "Quantidade": [contagem[t] for t in tipos],
-                "Total de Horas": [pesos_tempo[t] * contagem[t] for t in tipos]
-            })
-
-            total_quantidade = df_resultado["Quantidade"].sum()
-            total_tempo = df_resultado["Total de Horas"].sum()
-
-            total_row = pd.DataFrame({
-                "Tipo": ["TOTAL"],
-                "Peso (hh:mm)": [""],
-                "Quantidade": [total_quantidade],
-                "Total de Horas": [total_tempo]
-            })
-
-            df_resultado = pd.concat([df_resultado, total_row], ignore_index=True)
-
-            st.subheader("📊 Resultado Final")
-            st.dataframe(df_resultado)
-
-            # Gerar Excel
-            def converter_excel(df):
-                from io import BytesIO
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name="Resultado")
-                    writer.close()
-                return output.getvalue()
-
-            st.download_button(
-                label="📥 Baixar Resultado em Excel",
-                data=converter_excel(df_resultado),
-                file_name="resultado_pesos.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-    except Exception as e:
-        st.error(f"Erro ao processar a tabela: {e}")
+    st.download_button(
+        label="📥 Baixar Resultado em Excel",
+        data=converter_excel(df_resultado),
+        file_name="resultado_pesos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
-    st.info("Cole uma tabela para começar.")
+    st.info("Cole o texto acima para começar.")
