@@ -44,7 +44,7 @@ texto = st.text_area(
 
 if texto.strip() != "":
     st.subheader("⚙️ Ajustar Pesos (HH:MM)")
-    col1, col2 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     pesos_usuario = {}
 
