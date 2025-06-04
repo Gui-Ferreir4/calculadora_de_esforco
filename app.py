@@ -2,79 +2,82 @@ import streamlit as st
 import pandas as pd
 import re
 
+
 st.set_page_config(page_title="Calculadora de Tempos", layout="wide")
 
-st.title("⏱️ Calculadora de Tempos por Tipo - Via Copiar/Colar")
+st.title("⏱️ Calculadora de Tempos - Via Tabela Colada (2 linhas por item)")
+
 st.markdown("""
-Cole abaixo a tabela (copiada do Excel, incluindo os cabeçalhos). 
-O app busca a coluna chamada **"Componente"**, processa os itens e calcula os tempos com base nos pesos configurados.
+Cole abaixo a tabela copiada do Excel (onde cada item ocupa duas linhas). 
+O app buscará a coluna **"Componente"** e fará o cálculo com base nos pesos definidos.
 """)
 
-# Função para remover texto entre parênteses
+# Função para remover textos entre parênteses
 def limpar_tipo(texto):
     if pd.isna(texto):
         return ""
     return re.sub(r"\s*\(.*?\)", "", str(texto)).strip()
 
-# Lista de tipos válidos
+
 tipos = [
-    "Origem",
-    "Grupo de Controle",
-    "Canal",
-    "Decisão",
-    "Espera",
-    "Multiplas Rotas Paralelas",
-    "Contagem Dinâmica",
-    "Exportação de Público",
-    "Espera por uma data",
-    "Random Split",
-    "Join",
-    "Término"
+    "Origem", "Grupo de Controle", "Canal", "Decisão", "Espera",
+    "Multiplas Rotas Paralelas", "Contagem Dinâmica", "Exportação de Público",
+    "Espera por uma data", "Random Split", "Join", "Término"
 ]
 
-# Pesos padrão
 pesos_padrao = {
-    "Origem": "00:30",
-    "Grupo de Controle": "01:00",
-    "Canal": "01:00",
-    "Decisão": "00:30",
-    "Espera": "00:15",
-    "Multiplas Rotas Paralelas": "01:30",
-    "Contagem Dinâmica": "01:00",
-    "Exportação de Público": "00:30",
-    "Espera por uma data": "00:15",
-    "Random Split": "01:00",
-    "Join": "01:00",
+    "Origem": "00:30", "Grupo de Controle": "01:00", "Canal": "01:00",
+    "Decisão": "00:30", "Espera": "00:15", "Multiplas Rotas Paralelas": "01:30",
+    "Contagem Dinâmica": "01:00", "Exportação de Público": "00:30",
+    "Espera por uma data": "00:15", "Random Split": "01:00", "Join": "01:00",
     "Término": "00:15"
 }
 
-# Entrada de texto
+# Entrada da tabela
 st.subheader("📋 Cole aqui sua tabela (incluindo cabeçalhos)")
+
 texto = st.text_area(
     "Cole os dados aqui (copiados do Excel):",
-    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo\tPúblico\tMais informações\nxxx\tOrigem\t...\n..."
+    placeholder="Exemplo:\nID\tComponente\t...\nxxx\tOrigem\t...\n02/06/2025 ...\t3s\t..."
 )
 
 if texto.strip() != "":
     try:
-        # Processamento seguro da tabela
         linhas = texto.strip().splitlines()
-        linhas = [linha for linha in linhas if linha.strip() != ""]  # Remove linhas em branco
+        linhas = [linha for linha in linhas if linha.strip() != ""]
 
-        df = pd.DataFrame([linha.split('\t') for linha in linhas])
+        # Extrair cabeçalhos
+        cabecalho = linhas[0].split('\t')
+        linhas = linhas[1:]
 
-        df.columns = df.iloc[0]  # Primeira linha como cabeçalho
-        df = df.drop(df.index[0])  # Remove a linha do cabeçalho
+        registros = []
 
-        df = df.reset_index(drop=True)
+        for i in range(0, len(linhas), 2):
+            linha1 = linhas[i].split('\t')
+            linha2 = linhas[i + 1].split('\t') if i + 1 < len(linhas) else [""] * len(cabecalho)
+
+            registro = {}
+
+            # Combinar colunas da linha 1 e linha 2
+            for idx, nome_coluna in enumerate(cabecalho):
+                val1 = linha1[idx] if idx < len(linha1) else ""
+                val2 = linha2[idx] if idx < len(linha2) else ""
+
+                if nome_coluna in ["ID", "Componente"]:
+                    registro[nome_coluna] = val1
+                else:
+                    registro[nome_coluna] = val2 if val2 else val1
+
+            registros.append(registro)
+
+        df = pd.DataFrame(registros)
+
+        st.subheader("🗂️ Dados Interpretados")
+        st.dataframe(df)
 
         if "Componente" not in df.columns:
             st.error("⚠️ A tabela precisa ter uma coluna chamada 'Componente'. Verifique os cabeçalhos.")
         else:
-            st.subheader("🗂️ Dados Lidos")
-            st.dataframe(df)
-
-            # Processar coluna 'Componente'
             componentes = df["Componente"].map(limpar_tipo)
             contagem = componentes.value_counts().reindex(tipos, fill_value=0)
 
@@ -92,7 +95,7 @@ if texto.strip() != "":
                     valor = st.text_input(f"{tipo}:", value=pesos_padrao.get(tipo, "00:00"))
                     pesos_usuario[tipo] = valor
 
-            # Converter HH:MM em timedelta
+            # Conversão de HH:MM para timedelta
             def hhmm_para_timedelta(hhmm):
                 try:
                     h, m = map(int, hhmm.strip().split(":"))
@@ -102,7 +105,6 @@ if texto.strip() != "":
 
             pesos_tempo = {tipo: hhmm_para_timedelta(valor) for tipo, valor in pesos_usuario.items()}
 
-            # Montar tabela de resultado
             df_resultado = pd.DataFrame({
                 "Tipo": tipos,
                 "Peso (hh:mm)": [pesos_usuario[t] for t in tipos],
@@ -110,7 +112,6 @@ if texto.strip() != "":
                 "Total de Horas": [pesos_tempo[t] * contagem[t] for t in tipos]
             })
 
-            # Totais
             total_quantidade = df_resultado["Quantidade"].sum()
             total_tempo = df_resultado["Total de Horas"].sum()
 
@@ -126,7 +127,7 @@ if texto.strip() != "":
             st.subheader("📊 Resultado Final")
             st.dataframe(df_resultado)
 
-            # Download Excel
+            # Gerar Excel
             def converter_excel(df):
                 from io import BytesIO
                 output = BytesIO()
