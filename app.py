@@ -51,7 +51,7 @@ st.subheader("📝 Cole abaixo o texto com os componentes")
 texto = st.text_area(
     "Cole aqui os dados copiados da sua tabela ou sistema",
     height=250,
-    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo de execução\t...\n..."
+    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo de execução\tPúblico Selecionado\tMais informações\n684058ef31243a261fb51baa\tOrigem\tOk\t04/06/2025 - 11:37\t5s\t10\t -"
 )
 
 # 🚦 Processamento
