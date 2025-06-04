@@ -3,13 +3,13 @@ import pandas as pd
 import re
 
 
-st.set_page_config(page_title="Calculadora de Tempos", layout="wide")
+st.set_page_config(page_title="Calculadora de esforço", layout="wide")
 
-st.title("⏱️ Calculadora de Tempos por Detecção no Texto")
+st.title("⏱️ Calculadora de esforço - Jornada")
 
 st.markdown("""
 Cole abaixo qualquer texto que contenha os componentes (não precisa estar formatado como tabela).  
-O app irá identificar, contar e calcular os tempos de execução com base nos pesos definidos.
+O app irá identificar, contar e calcular o esforço aplicado com base nos pesos definidos.
 """)
 
 # Lista dos tipos conhecidos
@@ -21,23 +21,30 @@ tipos = [
 
 # Pesos padrão no formato HH:MM
 pesos_padrao = {
-    "Origem": "00:30", "Grupo de Controle": "01:00", "Canal": "01:00",
-    "Decisão": "00:30", "Espera": "00:15", "Multiplas Rotas Paralelas": "01:30",
-    "Contagem Dinâmica": "01:00", "Exportação de Público": "00:30",
-    "Espera por uma data": "00:15", "Random Split": "01:00", "Join": "01:00",
+    "Origem": "00:30", 
+    "Grupo de Controle": "01:00", 
+    "Canal": "01:00",
+    "Decisão": "00:30", 
+    "Espera": "00:15", 
+    "Multiplas Rotas Paralelas": "01:30",
+    "Contagem Dinâmica": "01:00", 
+    "Exportação de Público": "00:30",
+    "Espera por uma data": "00:15", 
+    "Random Split": "01:00", 
+    "Join": "01:00",
     "Término": "00:15"
 }
 
 # Campo de entrada de texto
 texto = st.text_area(
-    "📋 Cole aqui o texto (copiado de qualquer lugar, incluindo tabelas, prints do excel ou outros):",
+    "📋 Cole aqui o texto (copiado do histórico de contagem, ou histórico de execução)",
     height=300,
     placeholder="Cole aqui..."
 )
 
 if texto.strip() != "":
-    st.subheader("⚙️ Definir Pesos (HH:MM)")
-    col1, col2 = st.columns(2)
+    st.subheader("⚙️ Ajustar Pesos (HH:MM)")
+    col1, col2 = st.columns(3)
 
     pesos_usuario = {}
 
