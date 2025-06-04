@@ -2,24 +2,21 @@ import streamlit as st
 import pandas as pd
 import re
 
-st.set_page_config(page_title="Calculadora de Tempos", layout="wide")
+st.set_page_config(page_title="⏱️ Calculadora de Tempos por Componente", layout="wide")
 
 st.title("⏱️ Calculadora de Tempos por Componente")
 
-# Definição dos componentes
+# 🔧 Lista de componentes e pesos padrão
 tipos = [
     "Origem", "Grupo de Controle", "Canal", "Decisão", "Espera",
     "Multiplas Rotas Paralelas", "Contagem Dinâmica", "Exportação de Público",
     "Espera por uma data", "Random Split", "Join", "Término"
 ]
 
-# Pesos padrão no formato HH:MM
 pesos_padrao = ["00:30", "01:00", "01:00", "00:30", "00:15", "01:30",
                 "01:00", "00:30", "00:15", "01:00", "01:00", "00:15"]
 
-# ---------------------
-# Funções auxiliares
-# ---------------------
+# 🔣 Funções auxiliares
 
 def hhmm_para_minutos(hhmm):
     try:
@@ -36,90 +33,73 @@ def minutos_para_hhmm(minutos):
 def limpar_texto(texto):
     return re.sub(r'\(.*?\)', '', texto).lower()
 
-# ---------------------
-# Layout com abas
-# ---------------------
+# 📝 Entrada de dados
+st.subheader("📝 Cole o texto com os componentes")
+texto = st.text_area(
+    "Cole aqui o texto (copiado do Excel, sistema ou outra fonte)",
+    height=250,
+    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo de execução\tPúblico\tInformações\n..."
+)
 
-aba1, aba2, aba3 = st.tabs(["📝 Entrada de Texto", "⚙️ Configuração de Pesos", "📊 Resultado"])
+# 🔢 Processamento
+if texto.strip() != "":
+    texto_processado = limpar_texto(texto)
 
-# ---------------------
-# Aba 1 - Entrada
-# ---------------------
-
-with aba1:
-    st.subheader("📝 Cole o texto com os componentes")
-    texto = st.text_area(
-        "Cole aqui o texto (copiado de qualquer fonte, como Excel ou sistemas).",
-        height=300,
-        placeholder="Cole aqui..."
-    )
-
-# ---------------------
-# Aba 2 - Configuração de Pesos
-# ---------------------
-
-with aba2:
-    st.subheader("⚙️ Defina os Pesos de Cada Componente (HH:MM)")
-
-    df_pesos = pd.DataFrame({
-        "Componente": tipos,
-        "Peso (HH:MM)": pesos_padrao
-    })
-
-    df_pesos_editado = st.data_editor(
-        df_pesos,
-        num_rows="fixed",
-        use_container_width=True
-    )
-
-    # Validação dos pesos
-    pesos_validos = True
-    for p in df_pesos_editado["Peso (HH:MM)"]:
-        if hhmm_para_minutos(p) is None:
-            pesos_validos = False
-            st.error(f"❌ Peso inválido encontrado: '{p}'. Use o formato HH:MM.")
-            break
-
-# ---------------------
-# Aba 3 - Resultado
-# ---------------------
-
-with aba3:
-    st.subheader("📊 Resultado Final")
-
-    if texto.strip() == "":
-        st.info("⚠️ Cole o texto na aba 'Entrada de Texto' para gerar o resultado.")
-    elif not pesos_validos:
-        st.warning("⚠️ Corrija os pesos na aba 'Configuração de Pesos' para gerar o resultado.")
-    else:
-        texto_processado = limpar_texto(texto)
-
-        contagem = []
-        total_por_tipo = []
-
-        for idx, row in df_pesos_editado.iterrows():
-            componente = row["Componente"]
-            peso_hhmm = row["Peso (HH:MM)"]
-            peso_min = hhmm_para_minutos(peso_hhmm)
-
-            ocorrencias = len(
-                re.findall(rf'\b{re.escape(componente.lower())}\b', texto_processado)
-            )
-
-            total_min = ocorrencias * peso_min
-            contagem.append(ocorrencias)
-            total_por_tipo.append(total_min)
-
-        df_resultado = pd.DataFrame({
-            "Componente": tipos,
-            "Peso (HH:MM)": df_pesos_editado["Peso (HH:MM)"],
-            "Quantidade": contagem,
-            "Total de Horas (HH:MM)": [minutos_para_hhmm(m) for m in total_por_tipo]
+    # 🏗️ Construção da tabela
+    dados = []
+    for tipo, peso in zip(tipos, pesos_padrao):
+        dados.append({
+            "Componente": tipo,
+            "Peso (HH:MM)": peso,
+            "Quantidade": 0,
+            "Total de Horas (HH:MM)": "00:00"
         })
 
-        total_geral_min = sum(total_por_tipo)
-        total_geral_qtd = sum(contagem)
+    df = pd.DataFrame(dados)
 
+    # 🎯 Contagem
+    for i, row in df.iterrows():
+        componente = row["Componente"]
+        ocorrencias = len(
+            re.findall(rf'\b{re.escape(componente.lower())}\b', texto_processado)
+        )
+        df.at[i, "Quantidade"] = ocorrencias
+
+    # 🖊️ Editor da tabela (permite alterar os pesos)
+    st.subheader("📊 Resultado e Configuração dos Pesos")
+    df_editado = st.data_editor(
+        df,
+        num_rows="fixed",
+        use_container_width=True,
+        key="editor"
+    )
+
+    # 🚦 Validação dos pesos e cálculo dos totais
+    pesos_validos = True
+    total_geral_min = 0
+    total_geral_qtd = 0
+
+    totais = []
+
+    for i, row in df_editado.iterrows():
+        peso_min = hhmm_para_minutos(str(row["Peso (HH:MM)"]))
+        if peso_min is None:
+            pesos_validos = False
+            st.error(f"❌ Peso inválido para '{row['Componente']}'. Use HH:MM.")
+            break
+
+        qtd = int(row["Quantidade"])
+        total_min = peso_min * qtd
+
+        totais.append(minutos_para_hhmm(total_min))
+
+        total_geral_min += total_min
+        total_geral_qtd += qtd
+
+    if pesos_validos:
+        df_editado["Total de Horas (HH:MM)"] = totais
+
+        # ➕ Adiciona linha de total
         df_total = pd.DataFrame({
             "Componente": ["TOTAL"],
             "Peso (HH:MM)": [""],
@@ -127,11 +107,15 @@ with aba3:
             "Total de Horas (HH:MM)": [minutos_para_hhmm(total_geral_min)]
         })
 
-        df_resultado = pd.concat([df_resultado, df_total], ignore_index=True)
+        df_final = pd.concat([df_editado, df_total], ignore_index=True)
 
-        st.table(df_resultado)
+        st.dataframe(
+            df_final,
+            use_container_width=True,
+            height=(len(df_final) + 1) * 35
+        )
 
-        # Download Excel
+        # 📥 Download Excel
         def gerar_excel(df):
             from io import BytesIO
             output = BytesIO()
@@ -141,7 +125,9 @@ with aba3:
 
         st.download_button(
             label="📥 Baixar Resultado em Excel",
-            data=gerar_excel(df_resultado),
+            data=gerar_excel(df_final),
             file_name="resultado_tempos.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+else:
+    st.info("🔎 Cole o texto no campo acima para gerar o resultado.")
