@@ -45,27 +45,20 @@ texto = st.text_area(
 if texto.strip() != "":
     texto_processado = limpar_texto(texto)
 
-    # 🏗️ Construção da tabela
+    # 🏗️ Construção da tabela inicial
     dados = []
     for tipo, peso in zip(tipos, pesos_padrao):
+        ocorrencias = len(
+            re.findall(rf'\b{re.escape(tipo.lower())}\b', texto_processado)
+        )
         dados.append({
             "Componente": tipo,
             "Peso (HH:MM)": peso,
-            "Quantidade": 0,
-            "Total de Horas (HH:MM)": "00:00"
+            "Quantidade": ocorrencias
         })
 
     df = pd.DataFrame(dados)
 
-    # 🎯 Contagem
-    for i, row in df.iterrows():
-        componente = row["Componente"]
-        ocorrencias = len(
-            re.findall(rf'\b{re.escape(componente.lower())}\b', texto_processado)
-        )
-        df.at[i, "Quantidade"] = ocorrencias
-
-    # 🖊️ Editor da tabela (permite alterar os pesos)
     st.subheader("📊 Resultado e Configuração dos Pesos")
     df_editado = st.data_editor(
         df,
@@ -81,7 +74,7 @@ if texto.strip() != "":
 
     totais = []
 
-    for i, row in df_editado.iterrows():
+    for _, row in df_editado.iterrows():
         peso_min = hhmm_para_minutos(str(row["Peso (HH:MM)"]))
         if peso_min is None:
             pesos_validos = False
