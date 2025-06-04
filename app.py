@@ -49,9 +49,9 @@ def limpar_texto(texto):
 st.subheader("📝 Cole abaixo o texto com os componentes")
 
 texto = st.text_area(
-    "Cole aqui os dados copiados da sua tabela ou sistema",
+    "Cole aqui os dados copiados da do histórico de contagem ou execução (os dados não precisam estar formatados em tabela)",
     height=250,
-    placeholder="Exemplo:\nID\t                                                         | Componente\t | Status\t    | Início\t                        | Tempo de execução\t     | Público Selecionado\t     | Mais informações\n-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n684058ef31243a261fb51baa\t | Origem\t         | Ok\t            | 04/06/2025 - 11:37\t| 5s\t                                           | 10\t                                          | -\n..."
+    placeholder="Exemplo:\nID\t                                                         | Componente\t | Status\t    | Início\t                        | Tempo de execução\t     | Público Selecionado\t     | Mais informações\n-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n684058ef31243a261fb51baa\t | Origem\t         | Ok\t            | 04/06/2025 - 11:37\t| 5s\t                                             | 10\t                                          | -\n..."
 )
 
 # 🚦 Processamento
