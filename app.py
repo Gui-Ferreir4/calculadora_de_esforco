@@ -6,123 +6,116 @@ st.set_page_config(page_title="⏱️ Calculadora de Tempos por Componente", lay
 
 st.title("⏱️ Calculadora de Tempos por Componente")
 
-# 🔧 Definições iniciais
-tipos = [
+# 🎯 Configuração dos tipos e pesos padrão
+componentes = [
     "Origem", "Grupo de Controle", "Canal", "Decisão", "Espera",
     "Multiplas Rotas Paralelas", "Contagem Dinâmica", "Exportação de Público",
     "Espera por uma data", "Random Split", "Join", "Término"
 ]
 
-pesos_padrao = ["00:30", "01:00", "01:00", "00:30", "00:15", "01:30",
-                "01:00", "00:30", "00:15", "01:00", "01:00", "00:15"]
+pesos_padrao = {
+    "Origem": "00:30",
+    "Grupo de Controle": "01:00",
+    "Canal": "01:00",
+    "Decisão": "00:30",
+    "Espera": "00:15",
+    "Multiplas Rotas Paralelas": "01:30",
+    "Contagem Dinâmica": "01:00",
+    "Exportação de Público": "00:30",
+    "Espera por uma data": "00:15",
+    "Random Split": "01:00",
+    "Join": "01:00",
+    "Término": "00:15"
+}
 
-# 🔣 Funções auxiliares
+# 🔧 Funções auxiliares
 def hhmm_para_minutos(hhmm):
     try:
-        h, m = map(int, str(hhmm).strip().split(":"))
-        return h * 60 + m
+        horas, minutos = map(int, hhmm.strip().split(":"))
+        return horas * 60 + minutos
     except:
-        return None
+        return 0
 
 def minutos_para_hhmm(minutos):
-    h = minutos // 60
-    m = minutos % 60
-    return f"{h:02d}:{m:02d}"
+    horas = minutos // 60
+    minutos_restantes = minutos % 60
+    return f"{horas:02d}:{minutos_restantes:02d}"
 
 def limpar_texto(texto):
     texto_sem_parenteses = re.sub(r'\(.*?\)', '', texto)
     return texto_sem_parenteses.lower()
 
 # 📝 Entrada de texto
-st.subheader("📝 Cole o texto com os componentes")
+st.subheader("📝 Cole abaixo o texto com os componentes")
+
 texto = st.text_area(
-    "Cole aqui o texto (copiado do Excel, sistema ou outra fonte)",
+    "Cole aqui os dados copiados da sua tabela ou sistema",
     height=250,
-    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo de execução\tPúblico\tInformações\n..."
+    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo de execução\t...\n..."
 )
 
+# 🚦 Processamento
 if texto.strip() != "":
     texto_processado = limpar_texto(texto)
 
-    # 🏗️ Monta DataFrame base
     dados = []
-    for componente, peso in zip(tipos, pesos_padrao):
-        ocorrencias = len(re.findall(rf'\b{re.escape(componente.lower())}\b', texto_processado))
+
+    total_minutos_geral = 0
+    total_quantidade_geral = 0
+
+    for componente in componentes:
+        nome_proc = componente.lower()
+
+        # Contagem de ocorrências no texto
+        ocorrencias = len(re.findall(rf'\b{re.escape(nome_proc)}\b', texto_processado))
+
+        peso_hhmm = pesos_padrao.get(componente, "00:00")
+        peso_min = hhmm_para_minutos(peso_hhmm)
+
+        total_min = peso_min * ocorrencias
+
         dados.append({
             "Componente": componente,
-            "Peso (HH:MM)": peso,
+            "Peso (HH:MM)": peso_hhmm,
             "Quantidade": ocorrencias,
+            "Total de Horas (HH:MM)": minutos_para_hhmm(total_min)
         })
 
-    df_base = pd.DataFrame(dados)
+        total_minutos_geral += total_min
+        total_quantidade_geral += ocorrencias
 
-    # 🖊️ Tabela de ajuste de pesos e visualização dos resultados
-    st.subheader("⚙️ Ajuste os Pesos e Veja os Resultados")
+    # Linha de TOTAL
+    dados.append({
+        "Componente": "TOTAL",
+        "Peso (HH:MM)": "",
+        "Quantidade": total_quantidade_geral,
+        "Total de Horas (HH:MM)": minutos_para_hhmm(total_minutos_geral)
+    })
 
-    tabela_editada = st.data_editor(
-        df_base,
+    df_resultado = pd.DataFrame(dados)
+
+    # 📊 Exibição do resultado
+    st.subheader("📊 Resultado Final")
+    st.dataframe(
+        df_resultado,
         use_container_width=True,
-        num_rows="fixed",
-        column_config={
-            "Peso (HH:MM)": st.column_config.TextColumn(
-                help="Formato HH:MM (ex: 01:30)", width="medium"
-            )
-        }
+        height=(len(df_resultado) + 1) * 35
     )
 
-    # 🚦 Processamento dos totais
-    totais_hhmm = []
-    total_geral_min = 0
-    total_geral_qtd = 0
-    erro = False
+    # 📥 Download do resultado em Excel
+    def gerar_excel(df):
+        from io import BytesIO
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Resultado")
+        return output.getvalue()
 
-    for _, row in tabela_editada.iterrows():
-        peso_min = hhmm_para_minutos(row["Peso (HH:MM)"])
-        if peso_min is None:
-            st.error(f"❌ Peso inválido para '{row['Componente']}': '{row['Peso (HH:MM)']}'. Use HH:MM.")
-            erro = True
-            break
-
-        qtd = int(row["Quantidade"])
-        total_min = peso_min * qtd
-        totais_hhmm.append(minutos_para_hhmm(total_min))
-
-        total_geral_min += total_min
-        total_geral_qtd += qtd
-
-    if not erro:
-        tabela_editada["Total de Horas (HH:MM)"] = totais_hhmm
-
-        # ➕ Adiciona linha de total
-        linha_total = pd.DataFrame([{
-            "Componente": "TOTAL",
-            "Peso (HH:MM)": "",
-            "Quantidade": total_geral_qtd,
-            "Total de Horas (HH:MM)": minutos_para_hhmm(total_geral_min)
-        }])
-
-        resultado_final = pd.concat([tabela_editada, linha_total], ignore_index=True)
-
-        st.dataframe(
-            resultado_final,
-            use_container_width=True,
-            height=(len(resultado_final) + 1) * 35
-        )
-
-        # 📥 Download
-        def gerar_excel(df):
-            from io import BytesIO
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                df.to_excel(writer, index=False, sheet_name="Resultado")
-            return output.getvalue()
-
-        st.download_button(
-            label="📥 Baixar Resultado em Excel",
-            data=gerar_excel(resultado_final),
-            file_name="resultado_tempos.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    st.download_button(
+        label="📥 Baixar Resultado em Excel",
+        data=gerar_excel(df_resultado),
+        file_name="resultado_tempos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
     st.info("Cole o texto acima para gerar o resultado.")
