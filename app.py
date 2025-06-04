@@ -5,7 +5,10 @@ import re
 st.set_page_config(page_title="Calculadora de Tempos", layout="wide")
 
 st.title("⏱️ Calculadora de Tempos por Tipo - Via Copiar/Colar")
-st.markdown("Cole abaixo a tabela (direto do Excel, incluindo cabeçalhos). O app irá buscar os dados da coluna **'Componente'**, processar os itens e calcular os tempos com base nos pesos configurados.")
+st.markdown("""
+Cole abaixo a tabela (copiada do Excel, incluindo os cabeçalhos). 
+O app busca a coluna chamada **"Componente"**, processa os itens e calcula os tempos com base nos pesos configurados.
+""")
 
 # Função para remover texto entre parênteses
 def limpar_tipo(texto):
@@ -45,17 +48,25 @@ pesos_padrao = {
     "Término": "00:15"
 }
 
-# Entrada de dados em texto
+# Entrada de texto
 st.subheader("📋 Cole aqui sua tabela (incluindo cabeçalhos)")
 texto = st.text_area(
     "Cole os dados aqui (copiados do Excel):",
-    placeholder="Exemplo:\nID\tComponente\tOutro Campo\n1\tOrigem (Texto)\tABC\n2\tDecisão (Teste)\tXYZ"
+    placeholder="Exemplo:\nID\tComponente\tStatus\tInício\tTempo\tPúblico\tMais informações\nxxx\tOrigem\t...\n..."
 )
 
 if texto.strip() != "":
     try:
-        # Ler tabela a partir do texto
-        df = pd.read_csv(pd.io.common.StringIO(texto), sep="\t")
+        # Processamento seguro da tabela
+        linhas = texto.strip().splitlines()
+        linhas = [linha for linha in linhas if linha.strip() != ""]  # Remove linhas em branco
+
+        df = pd.DataFrame([linha.split('\t') for linha in linhas])
+
+        df.columns = df.iloc[0]  # Primeira linha como cabeçalho
+        df = df.drop(df.index[0])  # Remove a linha do cabeçalho
+
+        df = df.reset_index(drop=True)
 
         if "Componente" not in df.columns:
             st.error("⚠️ A tabela precisa ter uma coluna chamada 'Componente'. Verifique os cabeçalhos.")
@@ -63,7 +74,7 @@ if texto.strip() != "":
             st.subheader("🗂️ Dados Lidos")
             st.dataframe(df)
 
-            # Processamento
+            # Processar coluna 'Componente'
             componentes = df["Componente"].map(limpar_tipo)
             contagem = componentes.value_counts().reindex(tipos, fill_value=0)
 
