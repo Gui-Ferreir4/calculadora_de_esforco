@@ -56,8 +56,8 @@ if texto.strip() != "":
 
     df_base = pd.DataFrame(dados)
 
-    # 🖊️ Tabela editável
-    st.subheader("📊 Resultado — Ajuste os Pesos Conforme Necessário")
+    # 🖊️ Tabela de ajuste de pesos e visualização dos resultados
+    st.subheader("⚙️ Ajuste os Pesos e Veja os Resultados")
 
     tabela_editada = st.data_editor(
         df_base,
