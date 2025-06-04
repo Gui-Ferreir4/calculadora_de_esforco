@@ -31,7 +31,7 @@ pesos_padrao = {
 # 🔧 Funções auxiliares
 def hhmm_para_minutos(hhmm):
     try:
-        horas, minutos = map(int, hhmm.strip().split(":"))
+        horas, minutos = map(int, str(hhmm).strip().split(":"))
         return horas * 60 + minutos
     except:
         return 0
@@ -60,46 +60,71 @@ if texto.strip() != "":
 
     dados = []
 
-    total_minutos_geral = 0
-    total_quantidade_geral = 0
-
     for componente in componentes:
         nome_proc = componente.lower()
 
-        # Contagem de ocorrências no texto
         ocorrencias = len(re.findall(rf'\b{re.escape(nome_proc)}\b', texto_processado))
-
-        peso_hhmm = pesos_padrao.get(componente, "00:00")
-        peso_min = hhmm_para_minutos(peso_hhmm)
-
-        total_min = peso_min * ocorrencias
 
         dados.append({
             "Componente": componente,
-            "Peso (HH:MM)": peso_hhmm,
+            "Peso (HH:MM)": pesos_padrao.get(componente, "00:00"),
             "Quantidade": ocorrencias,
-            "Total de Horas (HH:MM)": minutos_para_hhmm(total_min)
         })
 
-        total_minutos_geral += total_min
-        total_quantidade_geral += ocorrencias
+    df_base = pd.DataFrame(dados)
 
-    # Linha de TOTAL
-    dados.append({
+    st.subheader("⚙️ Ajuste Peso ou Quantidade se necessário")
+
+    tabela_editada = st.data_editor(
+        df_base,
+        use_container_width=True,
+        num_rows="fixed",
+        column_config={
+            "Peso (HH:MM)": st.column_config.TextColumn(
+                help="Formato HH:MM. Ex.: 01:30",
+                width="medium"
+            ),
+            "Quantidade": st.column_config.NumberColumn(
+                help="Ajuste se necessário",
+                step=1,
+                min_value=0,
+                width="small"
+            )
+        }
+    )
+
+    # 🚦 Cálculo dos totais
+    totais_hhmm = []
+    total_geral_min = 0
+    total_geral_qtd = 0
+
+    for _, row in tabela_editada.iterrows():
+        peso_min = hhmm_para_minutos(row["Peso (HH:MM)"])
+        qtd = int(row["Quantidade"])
+
+        total_min = peso_min * qtd
+        totais_hhmm.append(minutos_para_hhmm(total_min))
+
+        total_geral_min += total_min
+        total_geral_qtd += qtd
+
+    tabela_editada["Total de Horas (HH:MM)"] = totais_hhmm
+
+    # ➕ Linha de total
+    linha_total = pd.DataFrame([{
         "Componente": "TOTAL",
         "Peso (HH:MM)": "",
-        "Quantidade": total_quantidade_geral,
-        "Total de Horas (HH:MM)": minutos_para_hhmm(total_minutos_geral)
-    })
+        "Quantidade": total_geral_qtd,
+        "Total de Horas (HH:MM)": minutos_para_hhmm(total_geral_min)
+    }])
 
-    df_resultado = pd.DataFrame(dados)
+    resultado_final = pd.concat([tabela_editada, linha_total], ignore_index=True)
 
-    # 📊 Exibição do resultado
     st.subheader("📊 Resultado Final")
     st.dataframe(
-        df_resultado,
+        resultado_final,
         use_container_width=True,
-        height=(len(df_resultado) + 1) * 35
+        height=(len(resultado_final) + 1) * 35
     )
 
     # 📥 Download do resultado em Excel
@@ -112,7 +137,7 @@ if texto.strip() != "":
 
     st.download_button(
         label="📥 Baixar Resultado em Excel",
-        data=gerar_excel(df_resultado),
+        data=gerar_excel(resultado_final),
         file_name="resultado_tempos.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
