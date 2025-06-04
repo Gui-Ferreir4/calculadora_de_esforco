@@ -57,43 +57,52 @@ if texto.strip() != "":
 
     # Contagem dos componentes no texto
     contagem = {}
+    texto_limpo = re.sub(r'\(.*?\)', '', texto)
     for tipo in tipos:
         padrao = re.compile(rf'\b{re.escape(tipo)}\b', re.IGNORECASE)
-        ocorrencias = len(padrao.findall(re.sub(r'\(.*?\)', '', texto)))
+        ocorrencias = len(padrao.findall(texto_limpo))
         contagem[tipo] = ocorrencias
 
-    # Conversão de HH:MM para timedelta
-    def hhmm_para_timedelta(hhmm):
+    # Conversão de HH:MM para minutos
+    def hhmm_para_minutos(hhmm):
         try:
             h, m = map(int, hhmm.strip().split(":"))
-            return pd.Timedelta(hours=h, minutes=m)
+            return h * 60 + m
         except:
-            return pd.Timedelta(0)
+            return 0
 
-    pesos_tempo = {tipo: hhmm_para_timedelta(valor) for tipo, valor in pesos_usuario.items()}
+    # Conversão de minutos para HH:MM
+    def minutos_para_hhmm(minutos):
+        h = minutos // 60
+        m = minutos % 60
+        return f"{h:02d}:{m:02d}"
+
+    pesos_minutos = {tipo: hhmm_para_minutos(valor) for tipo, valor in pesos_usuario.items()}
 
     # Montagem da tabela de resultados
+    total_por_tipo = {tipo: pesos_minutos[tipo] * contagem[tipo] for tipo in tipos}
+
     df_resultado = pd.DataFrame({
         "Tipo": tipos,
-        "Peso (hh:mm)": [pesos_usuario[t] for t in tipos],
+        "Peso (HH:MM)": [pesos_usuario[t] for t in tipos],
         "Quantidade": [contagem[t] for t in tipos],
-        "Total de Horas": [pesos_tempo[t] * contagem[t] for t in tipos]
+        "Total de Horas": [minutos_para_hhmm(total_por_tipo[t]) for t in tipos]
     })
 
     total_quantidade = df_resultado["Quantidade"].sum()
-    total_tempo = df_resultado["Total de Horas"].sum()
+    total_tempo_minutos = sum(total_por_tipo.values())
 
     total_row = pd.DataFrame({
         "Tipo": ["TOTAL"],
-        "Peso (hh:mm)": [""],
+        "Peso (HH:MM)": [""],
         "Quantidade": [total_quantidade],
-        "Total de Horas": [total_tempo]
+        "Total de Horas": [minutos_para_hhmm(total_tempo_minutos)]
     })
 
     df_resultado = pd.concat([df_resultado, total_row], ignore_index=True)
 
     st.subheader("📊 Resultado Final")
-    st.dataframe(df_resultado)
+    st.table(df_resultado)  # Tabela sem barra de rolagem
 
     # Gerar Excel
     def converter_excel(df):
